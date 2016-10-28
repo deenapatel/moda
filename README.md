@@ -1,4 +1,4 @@
 # moda
 commonly used functions for city datasets
 
-includes functions to read in common city datasets like PLUTO, PAD, etc. Also includes some geocoder functions, how to combine BBLs, etc. 
+includes functions to read common city datasets like PLUTO, PAD, etc into a pandas dataframe. Also includes functions for accessing the city geocoder (geoclient and geosupport), how to combine BBLs, etc. 
