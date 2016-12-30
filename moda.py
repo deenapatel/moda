@@ -290,9 +290,22 @@ def heatmap(df):
     for i, j in product(range(m), range(n)):
         _ = ax.text(j, i, '{0:,.0f}'.format(dfn.iloc[i, j]),
                     fontsize=18, ha='center', va='center')
+        
+def attributes(df):
+    '''returns a dataframe containing the counts and number of unique values
+    for all the attributes in a dataframe df
+    this is similar to what is returned in df.describe(), but works for numerical
+    data as well'''
+    return pd.DataFrame({'unique values':df.apply(lambda x: x.nunique()),
+                         'count':df.apply(lambda x: x.count())})
 
 
-
+def plotAllVars(df,uniqueID):
+    ''' Plot frequencies of all columns in dataframe df
+        The uniqueID is any column which is never null.
+        Can generally use the primary key'''
+    for i in df.drop(uniqueID,axis=1).columns:
+        df.groupby(i).count()[[uniqueID]].plot()
 
 
 
