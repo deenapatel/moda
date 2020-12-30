@@ -1,6 +1,6 @@
 import pandas as pd
 import geopandas as gpd
-from nyc_geoclient import Geoclient #python wrapper for geoclient
+#from nyc_geoclient import Geoclient #python wrapper for geoclient
 import sys
 import warnings
 import subprocess, os, re
@@ -18,12 +18,36 @@ import moda
 import cx_Oracle
 import databridge as db
 
-def databridge(sqlquery):
+def databridge(sqlquery,encrypted='no'):
     '''
     pass an sql query to databridge and return the output in a dataframe
+    encrypted = yes, no, or oca
     '''
+    
+    if encrypted =='no':
+        host = db.host
+        port = db.port
+        service = db.service
+        user = db.user
+        pswd = db.pswd
+        
+    elif encrypted =='yes':
+        host = db.encr_host
+        port = db.encr_port
+        service = db.encr_service
+        user = db.user
+        pswd = db.pswd
+        
+    elif encrypted =='oca':
+        host = db.hostOCA
+        port = db.portOCA
+        service = db.serviceOCA
+        user = db.userOCA
+        pswd = db.pswdOCA
+     
+    
     # open databridge connection
-    con = cx_Oracle.connect(db.user+'/'+db.pswd+'@'+db.host+':'+db.port+'/'+db.service)
+    con = cx_Oracle.connect(user+'/'+pswd+'@'+host+':'+port+'/'+service)
     cur = con.cursor()
     # query
     cur.execute(sqlquery)
@@ -34,23 +58,38 @@ def databridge(sqlquery):
     con.close()
     return df
 
+from sodapy import Socrata
+import opendata as od
+
+def socrata():
+    '''
+    return an open data dataset given by uid
+    needed for datasets that are not public
+    '''
+    request = Socrata('nycopendata.socrata.com', od.socrata_key,
+               username = od.socrata_username,
+               password = od.socrata_pswd)
+
+    return request
+    
+
 def readPluto():
     '''read in PLUTO data from all boros into one dataframe'''
     warnings.filterwarnings('ignore')
-    path = "/home/deena/Documents/data_munge/pluto/nyc_pluto_16v1/"
-    print 'PLUTO path:',path
+    path = "/home/deena/Documents/data_munge/pluto/nyc_pluto_17v1/"
+    #print 'PLUTO path:',path
     pluto = pd.DataFrame()
 
     borolist = ['MN','BX','BK','QN','SI']
     for boro in borolist:
-        df = pd.read_csv(path+boro+'.csv')
+        df = pd.read_csv(path+boro+'2017v1.csv')
         pluto = pd.concat([pluto,df],ignore_index=True)
     return pluto
 
 def readMapPluto():
     '''read in MapPLUTO data from all boros into one geodataframe'''
     path = '/home/deena/Documents/data_munge/mappluto16v1/'
-    print 'MapPLUTO path:',path
+    #print 'MapPLUTO path:',path
     mp=gpd.GeoDataFrame()
     
     borolist = ['mn','bx','bk','qn','si']
@@ -64,7 +103,7 @@ def readMapPlutoCSV():
     '''read in MapPLUTO csv files from all boros into one dataframe
     (used ogr2ogr to convert original shapefiles into csv)'''
     path = '/home/deena/Documents/data_munge/mappluto16v1/'
-    print 'MapPLUTO path:',path
+    #print 'MapPLUTO path:',path
     mp=pd.DataFrame()
     
     borolist = ['mn','bx','bk','qn','si']
@@ -83,8 +122,8 @@ def readPad(billbbl_flag=0):
     if billbbl_flag is set to 1, then it replaces the bbl field in pad_bbl with
     the billbbl field where it exits.
      '''
-    path = "/home/deena/Documents/data_munge/pad/pad16b/"
-    print 'PAD path', path
+    path = "/home/deena/Documents/data_munge/pad/pad19c/"
+    #print 'PAD path', path
     warnings.filterwarnings('ignore')
     
     pad_adr = pd.read_csv(path+'bobaadr.txt')
@@ -174,12 +213,12 @@ def geosupport(boro, houseNo, street,function = '1A', tpad='n', extend=''):
     '''
     
     # path to geosupport files and executables
-    path = '/home/deena/geosupport/version-16b_16.2/'
+    path = '/home/deena/geosupport/version-20d_20.4/'
 
     # set environment variables
     my_env = os.environ.copy()
     my_env["LD_LIBRARY_PATH"] = path+'lib'
-    my_env["GOEFILES"] = path+'fls/'
+    my_env["GEOFILES"] = path+'fls/'
 
     # path to geosupport executable
     geosupport = path+'bin/c_client'
@@ -226,12 +265,12 @@ def geosupportBatch(df,boro='boro',houseNo='houseNo',street='street'):
     returned dataframe will have two additional columns: geocodedBBL and geocodedBIN.
     '''
     # path to geosupport files and executables
-    path = '/home/deena/geosupport/version-16b_16.2/'
+    path = '/home/deena/geosupport/version-20d_20.4/'
 
     # set environment variables
     my_env = os.environ.copy()
     my_env["LD_LIBRARY_PATH"] = path+'lib'
-    my_env["GOEFILES"] = path+'fls/'
+    my_env["GEOFILES"] = path+'fls/'
 
     # path to geosupport executable
     expath = path+'bin/c_client'
@@ -254,14 +293,15 @@ def geosupportBatch(df,boro='boro',houseNo='houseNo',street='street'):
         try:
             # read input data to geosupport
             stdout_data = p.communicate(input=inputstring)
+            output = stdout_data[0].decode('utf-8')
             # search for BBL data in output
-            m = re.search('\[  6\]: BBL .+[\n]',stdout_data[0])
+            m = re.search('\[  6\]: Bbl .+[\n]',output)
             BBL = int(m.group()[-11:-1])
             # search for BIN data in output
-            m = re.search('BIN OF INPUT ADDRESS .+[\n]',stdout_data[0])
+            m = re.search('Bin Of Input Address .+[\n]',output)
             BIN = int(m.group()[-8:-1])
         except:
-            m = re.search('Error Message .+[\n]',stdout_data[0])
+            m = re.search('Error Message .+[\n]',output)
             BBL = m.group()
             BIN = m.group()
 
