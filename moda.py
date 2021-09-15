@@ -194,6 +194,35 @@ def geoclientBatch(df,address='address'):
     return df
 
 
+def geoclientBatchCensus(df,address='address'):
+    '''
+    Uses DOITT's GeoClient (the web interface to DCP's GeoSupport)
+    https://api.cityofnewyork.us/geoclient/v1/doc
+    Single Field Search input type
+    Returns the dataframe df with two additional columns: censustract and nta
+    '''
+    path = 'https://api.cityofnewyork.us/geoclient/v1/search.json?app_id=fb9ad04a&app_key=051f93e4125df4bae4f7c57517e62344&'
+
+    #warnings.filterwarnings('ignore') #do not display warnings
+    
+    def hitGeoC(df):
+        try:
+            query = {'input':df[address]}
+            response = get(path+urlencode(query))
+            results = response.json()['results'][0]['response']
+            m = results['censusTract2010']
+            m = re.sub('^\s+','',m)
+            censustract = re.sub('\s','0',m)
+            nta = results['nta']
+        except:
+            e = sys.exc_info()[0]
+            censustract = ( "Error: %s" % e )
+            nta = censustract
+        return censustract,nta
+    
+    df[['censustract','nta']] = df.apply(hitGeoC,axis=1).apply(pd.Series)
+    return df
+
 def geosupport(boro, houseNo, street,function = '1A', tpad='n', extend=''):
     '''
     Python wrapper for DCP's GeoSupport Desktop Edition, 
@@ -217,7 +246,8 @@ def geosupport(boro, houseNo, street,function = '1A', tpad='n', extend=''):
     '''
     
     # path to geosupport files and executables
-    path = '/home/deena/geosupport/version-20d_20.4/'
+    # path = '/home/deena/geosupport/version-20d_20.4/'
+    path = '/home/deena/geosupport/version-21b_21.2/'
 
     # set environment variables
     my_env = os.environ.copy()
@@ -250,7 +280,6 @@ def geosupport(boro, houseNo, street,function = '1A', tpad='n', extend=''):
     # output
     return stdout_data[0].splitlines(True)[14:]
 
-
 def geosupportBatch(df,boro='boro',houseNo='houseNo',street='street'):
     ''' 
     Batch processing using GeoSupport function 1A, and returning BBL and BIN
@@ -269,7 +298,9 @@ def geosupportBatch(df,boro='boro',houseNo='houseNo',street='street'):
     returned dataframe will have two additional columns: geocodedBBL and geocodedBIN.
     '''
     # path to geosupport files and executables
-    path = '/home/deena/geosupport/version-20d_20.4/'
+    # path = '/home/deena/geosupport/version-20d_20.4/'
+    path ='/home/deena/geosupport/version-21b_21.2/'
+
 
     # set environment variables
     my_env = os.environ.copy()
@@ -314,6 +345,77 @@ def geosupportBatch(df,boro='boro',houseNo='houseNo',street='street'):
     df[['geocodedBBL','geocodedBIN']] = df.apply(hitGeoS,axis=1).apply(pd.Series)
     return df
     
+def geosupportBatchCensus(df,boro='boro',houseNo='houseNo',street='street'):
+    ''' 
+    Batch processing using GeoSupport function 1, 
+    returns 2010 census tract and nta
+    
+    1. Download the Linux version from DCP's website: 
+    http://www1.nyc.gov/site/planning/data-maps/open-data/dwn-gde-home.page
+    2. Set 'path' to point to where you downloaded the geosupport folder to
+    
+    GeoSupport User Guide: http://www1.nyc.gov/assets/planning/download/pdf/data-maps/open-data/upg.pdf
+    
+    input:  dataframe df, with column names containing information on 
+            the borough (boro = 1-5), 
+            address house number (houseNo),
+            and address street name (street).
+    
+    returned dataframe will have two additional columns: censustract and nta.
+    '''
+    # path to geosupport files and executables
+    # path = '/home/deena/geosupport/version-20d_20.4/'
+    path ='/home/deena/geosupport/version-21b_21.2/'
+
+    # set environment variables
+    my_env = os.environ.copy()
+    my_env["LD_LIBRARY_PATH"] = path+'lib'
+    my_env["GEOFILES"] = path+'fls/'
+
+    # path to geosupport executable
+    expath = path+'bin/c_client'
+
+    def hitGeoS(df):
+        # open subprocess to run geosupport
+        p = subprocess.Popen([expath],
+                             env=my_env, 
+                             stdout=subprocess.PIPE,
+                             stdin=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+
+        # this works with function 1A which takes address or non-addressable place name
+        # as input and returns property related data including BIN, BBL
+        inputstring = '{}\n{}\n{}\n{}\n{}\n{}\n{}\n'.format('1',
+                                                            df[boro],
+                                                            df[houseNo],
+                                                            df[street],
+                                                            '','','x').encode('utf-8')
+        try:
+            # read input data to geosupport
+            stdout_data = p.communicate(input=inputstring)
+            output = stdout_data[0].decode('utf-8')
+           
+            # extract census tract from output
+            m = re.search('\[ 66\]: 2010 Census Tract .*[\n]',output)
+            m = m.group()[-8:-1]
+            m = re.sub('^\s+','',m)
+            censustract = re.sub('\s','0',m)
+           
+            # extract nta from output
+            m = re.search('\[ 72\]: Nta .*[\n]',output)
+            nta = m.group()[-5:-1]
+            
+        except:
+            m = re.search('Error Message .*[\n]',output)
+            censustract = m.group()
+            nta = m.group()
+
+        return censustract,nta
+    
+    df[['censustract','nta']] = df.apply(hitGeoS,axis=1).apply(pd.Series)
+    return df
+
+
 
 def heatmap(df):
     '''heat map representation of a dataframe (all values should be numerical)
