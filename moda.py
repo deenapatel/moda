@@ -173,7 +173,8 @@ def geoclientBatch(df,address='address'):
     Single Field Search input type
     Returns the dataframe df with two additional columns: geocodedBBL and geocodedBIN
     '''
-    path = 'https://api.cityofnewyork.us/geoclient/v1/search.json?app_id=fb9ad04a&app_key=051f93e4125df4bae4f7c57517e62344&'
+  
+    path = 'https://api.nyc.gov/geo/geoclient/v1/address.json?subscription-key=46568ebcfa154bbcb23cd1e2c1284cef'
 
     #warnings.filterwarnings('ignore') #do not display warnings
     
@@ -201,7 +202,7 @@ def geoclientBatchCensus(df,address='address'):
     Single Field Search input type
     Returns the dataframe df with two additional columns: censustract and nta
     '''
-    path = 'https://api.cityofnewyork.us/geoclient/v1/search.json?app_id=fb9ad04a&app_key=051f93e4125df4bae4f7c57517e62344&'
+    path = 'https://api.nyc.gov/geo/geoclient/v1/address.json?subscription-key=46568ebcfa154bbcb23cd1e2c1284cef'
 
     #warnings.filterwarnings('ignore') #do not display warnings
     
