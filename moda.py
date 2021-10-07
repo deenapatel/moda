@@ -165,17 +165,22 @@ def extractAddress(series):
     street = series.str.extract('(\s.+$)',expand=False)
     return number,street
 
-
 def geoclientBatch(df,address='address'):
     '''
     Uses DOITT's GeoClient (the web interface to DCP's GeoSupport)
     https://api.cityofnewyork.us/geoclient/v1/doc
     Single Field Search input type
+    
+    Inputs: df = dataframe to be geocoded, 
+    address = the name of the column with the address or input as a string
+    input can be address and zip, address and borough, bbl, bin
+    
     Returns the dataframe df with two additional columns: geocodedBBL and geocodedBIN
+    
     '''
-  
-    path = 'https://api.nyc.gov/geo/geoclient/v1/address.json?subscription-key=46568ebcfa154bbcb23cd1e2c1284cef'
-
+    path = 'https://api.nyc.gov/geo/geoclient/v1/search.json?subscription-key=46568ebcfa154bbcb23cd1e2c1284cef&'
+    
+    
     #warnings.filterwarnings('ignore') #do not display warnings
     
     def hitGeoC(df):
@@ -202,7 +207,7 @@ def geoclientBatchCensus(df,address='address'):
     Single Field Search input type
     Returns the dataframe df with two additional columns: censustract and nta
     '''
-    path = 'https://api.nyc.gov/geo/geoclient/v1/address.json?subscription-key=46568ebcfa154bbcb23cd1e2c1284cef'
+    path = 'https://api.nyc.gov/geo/geoclient/v1/address.json?subscription-key=46568ebcfa154bbcb23cd1e2c1284cef&'
 
     #warnings.filterwarnings('ignore') #do not display warnings
     
