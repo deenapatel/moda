@@ -229,6 +229,41 @@ def geoclientBatchCensus(df,address='address'):
     df[['censustract','nta']] = df.apply(hitGeoC,axis=1).apply(pd.Series)
     return df
 
+
+def geoclientBatchCD(df,address='address'):
+    '''
+    Uses DOITT's GeoClient (the web interface to DCP's GeoSupport)
+    https://api.cityofnewyork.us/geoclient/v1/doc
+    Single Field Search input type
+    
+    Inputs: df = dataframe to be geocoded, 
+    address = the name of the column with the address or input as a string
+    input can be address and zip, address and borough, bbl, bin
+    
+    Returns the dataframe df with two additional columns: geocodedBBL and geocodedBIN
+    
+    '''
+    path = 'https://api.nyc.gov/geo/geoclient/v1/search.json?subscription-key=46568ebcfa154bbcb23cd1e2c1284cef&'
+    
+    
+    #warnings.filterwarnings('ignore') #do not display warnings
+    
+    def hitGeoC(df):
+        try:
+            query = {'input':df[address]}
+            response = get(path+urlencode(query))
+            results = response.json()['results'][0]['response']            
+            cd = results['communityDistrict']
+        except:
+            e = sys.exc_info()[0]
+            cd = ( "Error: %s" % e )
+        return cd
+    
+    df[['communitydistrict']] = df.apply(hitGeoC,axis=1).apply(pd.Series)
+    return df
+
+
+
 def geosupport(boro, houseNo, street,function = '1A', tpad='n', extend=''):
     '''
     Python wrapper for DCP's GeoSupport Desktop Edition, 
@@ -421,6 +456,68 @@ def geosupportBatchCensus(df,boro='boro',houseNo='houseNo',street='street'):
     df[['censustract','nta']] = df.apply(hitGeoS,axis=1).apply(pd.Series)
     return df
 
+def geosupportBatchCD(df,boro='boro',houseNo='houseNo',street='street'):
+    ''' 
+    Batch processing using GeoSupport function 1B, 
+    returns Community District
+    
+    1. Download the Linux version from DCP's website: 
+    http://www1.nyc.gov/site/planning/data-maps/open-data/dwn-gde-home.page
+    2. Set 'path' to point to where you downloaded the geosupport folder to
+    
+    GeoSupport User Guide: http://www1.nyc.gov/assets/planning/download/pdf/data-maps/open-data/upg.pdf
+    
+    input:  dataframe df, with column names containing information on 
+            the borough (boro = 1-5), 
+            address house number (houseNo),
+            and address street name (street).
+    
+    returned dataframe will have an additional columns: cd.
+    '''
+    # path to geosupport files and executables
+    # path = '/home/deena/geosupport/version-20d_20.4/'
+    path ='/home/deena/geosupport/version-21b_21.2/'
+
+    # set environment variables
+    my_env = os.environ.copy()
+    my_env["LD_LIBRARY_PATH"] = path+'lib'
+    my_env["GEOFILES"] = path+'fls/'
+
+    # path to geosupport executable
+    expath = path+'bin/c_client'
+
+    def hitGeoS(df):
+        # open subprocess to run geosupport
+        p = subprocess.Popen([expath],
+                             env=my_env, 
+                             stdout=subprocess.PIPE,
+                             stdin=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+
+        # this works with function 1B which takes address or non-addressable place name
+        # as input
+        inputstring = '{}\n{}\n{}\n{}\n{}\n{}\n{}\n'.format('1B',
+                                                            df[boro],
+                                                            df[houseNo],
+                                                            df[street],
+                                                            '','','x').encode('utf-8')
+        try:
+            # read input data to geosupport
+            stdout_data = p.communicate(input=inputstring)
+            output = stdout_data[0].decode('utf-8')
+           
+            # extract cd from output
+            m = re.search('\[ 30\]: Community District: .*[\n]',output)
+            cd = m.group()[-5:-1]
+            
+        except:
+            m = re.search('Error Message .*[\n]',output)
+            cd = m.group()
+
+        return cd
+    
+    df[['communitydistrict']] = df.apply(hitGeoS,axis=1).apply(pd.Series)
+    return df
 
 
 def heatmap(df):
